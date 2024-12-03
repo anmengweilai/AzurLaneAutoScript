@@ -19,6 +19,7 @@ class ConnectionAttr:
     serial: str
 
     adb_binary_list = [
+        '/opt/homebrew/bin/adb',
         './bin/adb/adb.exe',
         './toolkit/Lib/site-packages/adbutils/binaries/adb.exe',
         '/usr/bin/adb'
