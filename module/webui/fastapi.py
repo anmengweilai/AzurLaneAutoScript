@@ -4,6 +4,7 @@ Copy from pywebio.platform.fastapi
 import asyncio
 import os
 import traceback
+from pathlib import Path
 
 import uvicorn
 from pywebio.platform.fastapi import (STATIC_PATH, Session, cdn_validation,
@@ -23,6 +24,10 @@ from module.webui.control.routes import ControlApi
 from module.webui.control.errors import ControlApiError
 from module.webui.control.routes import error_response
 from module.webui.error_rendering import render_exception_html
+
+# Built Umi frontend (frontend/dist), served under /app so that it shares an
+# origin with the Control API at /api/v1.
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 class HeaderMiddleware(BaseHTTPMiddleware):
@@ -88,6 +93,20 @@ def asgi_app(
     if static_dir:
         routes.append(
             Mount("/static", app=StaticFiles(directory=static_dir), name="static")
+        )
+    if (FRONTEND_DIST / "index.html").is_file():
+        routes.append(
+            Mount(
+                "/app",
+                app=StaticFiles(directory=str(FRONTEND_DIST), html=True),
+                name="control_web",
+            )
+        )
+        logger.info(f"Control web served at /app from {FRONTEND_DIST}")
+    else:
+        logger.warning(
+            f"Control web frontend not found at {FRONTEND_DIST}, "
+            f"run `npm run build` in frontend/ to enable /app"
         )
     routes.append(
         Mount(

@@ -4,6 +4,9 @@ export default defineConfig({
   antd: {},
   request: {},
   hash: true,
+  // 生产产物由后端挂在 /app 下：只改资源前缀，路由仍走 hash，避免 basename 与 hash 冲突
+  publicPath: '/app/',
+  title: 'ALAS',
   history: { type: 'hash' },
   favicons: [],
   layout: false,
