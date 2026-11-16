@@ -1,13 +1,27 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Row, Segmented, Typography } from 'antd';
-import { useEffect, useState } from 'react';
 import { api } from '@/services/api';
 import type { Bootstrap } from '@/types';
+
+const REPOSITORY_URL = 'https://github.com/LmeSzinc/AzurLaneAutoScript';
+
+function isChinese(language?: string) {
+  return Boolean(language?.startsWith('zh'));
+}
 
 export default function Home() {
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
 
-  const load = async () => setBootstrap(await api<Bootstrap>('/api/v1/bootstrap'));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(async () => {
+    const data = await api<Bootstrap>('/api/v1/bootstrap');
+    setBootstrap(data);
+  }, []);
+
+  useEffect(() => {
+    load().catch(() => {});
+    window.addEventListener('alas-settings-changed', load);
+    return () => window.removeEventListener('alas-settings-changed', load);
+  }, [load]);
 
   const update = async (values: Record<string, any>) => {
     await api('/api/v1/settings', { method: 'PATCH', body: JSON.stringify(values) });
@@ -15,8 +29,25 @@ export default function Home() {
     window.dispatchEvent(new CustomEvent('alas-settings-changed'));
   };
 
+  const chinese = isChinese(bootstrap?.settings.language);
+
   return (
     <div className="alas-page">
+      <Alert
+        type="warning"
+        showIcon
+        message={
+          chinese
+            ? 'Alas 是一款免费开源软件，如果你在任何渠道付费购买了 Alas，请退款。'
+            : 'Alas is free open-source software. If you paid for Alas from any channel, please request a refund.'
+        }
+        description={
+          <>
+            {chinese ? '项目仓库：' : 'Repository: '}
+            <Typography.Link href={REPOSITORY_URL} target="_blank">{REPOSITORY_URL}</Typography.Link>
+          </>
+        }
+      />
       <Row gutter={[16, 16]}>
         <Col xs={24} md={12}>
           <Card title="语言 / Language">

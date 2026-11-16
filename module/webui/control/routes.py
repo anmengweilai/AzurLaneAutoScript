@@ -3,11 +3,12 @@ import platform
 import subprocess
 import sys
 import time
+from urllib.parse import quote
 from typing import Any, Dict, List
 
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
@@ -17,7 +18,6 @@ from module.webui.control.events import EventHub, InternalErrorBus, ProcessLogCo
 from module.webui.control.instances import InstanceControl, validate_name
 from module.webui.control.security import ControlSecurity
 from module.webui.control.config import ConfigControl
-from module.webui.control.management import config_filename
 from module.webui.control.overview import overview
 from module.webui.control.system import remote_status, runtime
 from module.webui.control.update import UpdateControl
@@ -157,6 +157,7 @@ class ControlApi:
     async def bootstrap(self, request: Request) -> JSONResponse:
         from module.config.utils import LANGUAGES
         from module.webui import lang
+        from module.config.env import IS_ON_PHONE_CLOUD
 
         try:
             identity = self.security.authenticate(request)
@@ -167,6 +168,7 @@ class ControlApi:
                 "authenticated": identity is not None,
                 "identity": identity,
                 "api": "v1",
+                "is_on_phone_cloud": IS_ON_PHONE_CLOUD,
                 "settings": {
                     "language": lang.LANG,
                     "theme": State.theme,
@@ -296,8 +298,16 @@ class ControlApi:
     async def export_config(self, request: Request):
         self.security.authenticate(request)
         name = request.path_params["name"]
-        path = await run_in_threadpool(self.config.export_path, name)
-        return FileResponse(path=path, filename=config_filename(name))
+        result = await run_in_threadpool(self.config.export, name)
+        filename = result["filename"]
+        content = result["content"]
+        return JSONResponse(
+            content,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+            },
+        )
 
     async def instance_overview(self, request: Request) -> JSONResponse:
         self.security.authenticate(request)

@@ -169,6 +169,27 @@ body {
   line-height: 56px;
 }
 
+.alas-global-notices {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.alas-global-alert.ant-alert {
+  overflow: hidden;
+  border: 1px solid var(--alas-split, #f0f0f0);
+  border-radius: var(--alas-radius, 6px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+}
+
 .scheduler-extra.ant-btn {
   min-width: 76px;
 }
@@ -241,6 +262,22 @@ body {
   min-height: 64px;
   padding: 8px;
   overflow: hidden;
+}
+
+.aside-button-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.aside-button-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .aside-icon {
@@ -589,6 +626,21 @@ body.scheduler-resizing {
   gap: 16px;
   min-width: 0;
   height: 100%;
+}
+
+.config-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.config-group-card {
+  scroll-margin-top: 16px;
+}
+
+.arg-form-item {
+  margin-bottom: 0;
 }
 
 .arg-group {

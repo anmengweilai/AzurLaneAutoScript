@@ -3087,6 +3087,9 @@
       "Import": "導入",
       "Export": "匯出",
       "Delete": "删除",
+      "NameRequired": "請輸入設定檔案名稱",
+      "NameTooLong": "設定檔案名稱不能超過 64 個字元",
+      "FileTooLarge": "檔案不能超過 1MB",
       "OverrideWarning": "将会覆蓋现有的設定檔案",
       "ImportSuccess": "設定檔案已導入",
       "NewSuccess": "設定檔案已新增",
@@ -3114,6 +3117,12 @@
       "DetailedHistory": "詳細提交歷史"
     },
     "Remote": {
+      "State": "狀態",
+      "Enabled": "配置啟用",
+      "PasswordConfigured": "密碼配置",
+      "True": "已啟用",
+      "False": "未啟用",
+      "Loading": "載入中...",
       "Running": "運行中",
       "NotRunning": "未運行，与伺服器的連接斷開或伺服器離線",
       "NotEnable": "未啟用，在 deploy.yaml 中設定 webui 密碼並啟用遠程控制",

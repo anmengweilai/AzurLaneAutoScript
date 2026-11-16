@@ -121,8 +121,16 @@ export default function Update() {
   };
 
   const versionRows = [
-    { key: 'local', label: tr('Gui.Update.Local', '本地'), commit: status?.local },
-    { key: 'upstream', label: tr('Gui.Update.Upstream', '上游仓库'), commit: status?.upstream },
+    {
+      key: 'local',
+      label: tr('Gui.Update.Local', '本地'),
+      ...(status?.local || {}),
+    },
+    {
+      key: 'upstream',
+      label: tr('Gui.Update.Upstream', '上游仓库'),
+      ...(status?.upstream || {}),
+    },
   ];
   const versionColumns = [
     { title: '', dataIndex: 'label', width: 120 },

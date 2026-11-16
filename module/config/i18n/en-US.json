@@ -3087,6 +3087,9 @@
       "Import": "Import",
       "Export": "Export",
       "Delete": "Delete",
+      "NameRequired": "Enter a config name",
+      "NameTooLong": "Config name cannot exceed 64 characters",
+      "FileTooLarge": "File cannot exceed 1MB",
       "OverrideWarning": "This will override the current config!",
       "ImportSuccess": "Import succeeded",
       "NewSuccess": "Add config succeeded",
@@ -3114,6 +3117,12 @@
       "DetailedHistory": "Detailed Commit History"
     },
     "Remote": {
+      "State": "Status",
+      "Enabled": "Remote enabled",
+      "PasswordConfigured": "Password configured",
+      "True": "Enabled",
+      "False": "Disabled",
+      "Loading": "Loading...",
       "Running": "Remote access on",
       "NotRunning": "Not running, server disconnected or offline",
       "NotEnable": "Disabled, set webui password in deploy.yaml and enable remote access",

@@ -3087,6 +3087,9 @@
       "Import": "インポート",
       "Export": "エクスポート",
       "Delete": "削除",
+      "NameRequired": "コンフィグ名を入力してください",
+      "NameTooLong": "コンフィグ名は64文字以内にしてください",
+      "FileTooLarge": "ファイルは1MB以内にしてください",
       "OverrideWarning": "This will override the current config!",
       "ImportSuccess": "インポート成功",
       "NewSuccess": "追加成功",
@@ -3114,11 +3117,17 @@
       "DetailedHistory": "詳しい提出履歴"
     },
     "Remote": {
+      "State": "状態",
+      "Enabled": "遠隔操作有効",
+      "PasswordConfigured": "パスワード設定済み",
+      "True": "有効",
+      "False": "無効",
+      "Loading": "読み込み中...",
       "Running": "実行中",
       "NotRunning": "サーバーとの接続が中断したため、実行していない",
-      "NotEnable": "未启用，在 deploy.yaml 中设置 webui 密码并启用远程控制",
-      "EntryPoint": "远程访问 url 地址:",
-      "ConfigureHint": "配置教程：",
+      "NotEnable": "無効です。deploy.yaml で webui パスワードを設定し、遠隔操作を有効にしてください",
+      "EntryPoint": "接続 URL:",
+      "ConfigureHint": "設定チュートリアル：",
       "SSHNotInstall": "システムでsshツールが探さない、sshツールをインストールしてください"
     },
     "Text": {

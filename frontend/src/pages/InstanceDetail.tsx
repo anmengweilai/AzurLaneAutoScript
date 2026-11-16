@@ -5,6 +5,7 @@ import { useLocalStorageState, useSize } from 'ahooks';
 import DynamicConfig from '@/components/DynamicConfig';
 import LogsPanel from '@/components/LogsPanel';
 import { api } from '@/services/api';
+import { isToolSection } from '@/utils/configSchema';
 import { translate, type TranslationMap } from '@/i18n';
 import type { Instance } from '@/types';
 
@@ -118,6 +119,7 @@ export default function InstanceDetail(props?: { instanceName?: string }) {
 
   const search = window.location.hash.split('?')[1] || '';
   const selectedTask = new URLSearchParams(search).get('task') || 'Overview';
+  const toolPageTask = isToolSection(menu, selectedTask);
 
   const loadInstance = useCallback(async () => {
     setInstance(await api<Instance>(`/api/v1/instances/${encodeURIComponent(instanceName)}`));
@@ -471,7 +473,7 @@ export default function InstanceDetail(props?: { instanceName?: string }) {
           </Card>
         </div>
       ) : taskGroups.length ? (
-        <div className="config-groups">
+        <div className={toolPageTask ? 'config-groups tool-page' : 'config-groups'}>
           <div className="config-groups-inner">
             <Card
               size="small"
@@ -496,6 +498,7 @@ export default function InstanceDetail(props?: { instanceName?: string }) {
                 args={args}
                 config={config}
                 i18n={i18n}
+                toolPage={toolPageTask}
                 onSaved={loadConfig}
               />
             </Card>

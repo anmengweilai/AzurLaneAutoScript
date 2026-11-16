@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from module.webui.control.config import ConfigControl
+from module.webui.control.errors import InvalidArgument
 from module.webui.control.instances import InstanceControl
 from module.webui.control.events import EventHub
 from module.webui.process_manager import ProcessManager
@@ -8,6 +10,25 @@ from module.webui.updater import updater
 
 
 class InstanceControlTest(unittest.TestCase):
+    def test_import_config_overwrites_existing_instance(self):
+        control = ConfigControl()
+
+        with patch("module.config.utils.alas_instance", return_value=["existing"]), \
+                patch("module.webui.control.config.State") as state:
+            result = control.import_config("existing.json", '{"Alas": {}}')
+
+        self.assertEqual(result, {"name": "existing", "mod": "alas"})
+        state.config_updater.write_file.assert_called_once_with(
+            "existing", {"Alas": {}}, "alas"
+        )
+
+    def test_import_config_rejects_template_name(self):
+        control = ConfigControl()
+
+        with patch("module.webui.control.config.State"):
+            with self.assertRaises(InvalidArgument):
+                control.import_config("template.json", '{"Alas": {}}')
+
     def test_payload_uses_process_is_alive(self):
         process = MagicMock()
         process.is_alive.return_value = True

@@ -1,5 +1,6 @@
 export type Bootstrap = {
   authenticated: boolean;
+  is_on_phone_cloud?: boolean;
   settings: {
     language: string;
     theme: 'default' | 'dark';

@@ -1,16 +1,17 @@
-import { ConfigProvider, Spin, theme } from 'antd';
+import { Alert, Button, ConfigProvider, Spin, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import enUS from 'antd/locale/en_US';
 import jaJP from 'antd/locale/ja_JP';
 import zhTW from 'antd/locale/zh_TW';
 import { Outlet, useLocation } from '@umijs/max';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import alasIcon from '@/assets/gui/icon/alas.svg';
 import developIcon from '@/assets/gui/icon/develop.svg';
 import runIcon from '@/assets/gui/icon/run.svg';
 import settingIcon from '@/assets/gui/icon/setting.svg';
 import InternalErrorMonitor from '@/components/InternalErrorMonitor';
 import { api } from '@/services/api';
+import { useGlobalAlasStatus } from '@/hooks/useGlobalAlasStatus';
 import { translate, type TranslationMap } from '@/i18n';
 import type { Bootstrap, Instance } from '@/types';
 
@@ -38,6 +39,8 @@ const PAGE_TITLES: Record<string, string> = {
 
 type MenuLink = { task: string; label: string; path: string };
 
+const CONNECTION_FAILURE_THRESHOLD = 2;
+
 export default function BasicLayout() {
   const location = useLocation();
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
@@ -45,6 +48,9 @@ export default function BasicLayout() {
   const [menu, setMenu] = useState<Record<string, any>>();
   const [i18n, setI18n] = useState<TranslationMap>();
   const [loadError, setLoadError] = useState('');
+  const [shellConnected, setShellConnected] = useState(false);
+  const [connectionLost, setConnectionLost] = useState(false);
+  const failureCount = useRef(0);
 
   const path = location.pathname;
   const detailMatch = path.match(/^\/instances\/([^/]+)/);
@@ -62,6 +68,9 @@ export default function BasicLayout() {
       ]);
       setBootstrap(boot);
       setInstances(instanceItems.items);
+      failureCount.current = 0;
+      setShellConnected(true);
+      setConnectionLost(false);
       try {
         setI18n(await api<TranslationMap>(`/api/v1/i18n/${boot.settings.language}`));
       } catch {
@@ -71,6 +80,8 @@ export default function BasicLayout() {
         window.location.hash = '#/login';
       }
     } catch (error: any) {
+      failureCount.current += 1;
+      setConnectionLost(failureCount.current >= CONNECTION_FAILURE_THRESHOLD);
       setLoadError(error.message || String(error));
     }
   }, [path]);
@@ -111,6 +122,11 @@ export default function BasicLayout() {
     }
   }, [bootstrap?.authenticated, path]);
 
+  const { updateAvailable } = useGlobalAlasStatus({
+    connected: shellConnected && !connectionLost,
+    authenticated: Boolean(bootstrap?.authenticated),
+  });
+
   const menuLinks = useMemo<MenuLink[]>(() => {
     if (!selectedName || !menu) {
       return [];
@@ -140,9 +156,11 @@ export default function BasicLayout() {
         '/update': 'Gui.MenuDevelop.Update',
         '/remote': 'Gui.MenuDevelop.Remote',
         '/utils': 'Gui.MenuDevelop.Utils',
-        '/manage': 'Gui.AddAlas.Manage',
+        '/manage': 'Gui.AppManage.PageTitle',
       }[path] || path, PAGE_TITLES[path])
       : 'Home';
+
+  const showUpdateHint = !connectionLost && updateAvailable;
 
   if (!bootstrap) {
     return (
@@ -202,6 +220,36 @@ export default function BasicLayout() {
           <div className="alas-header-title"><h1>{headerTitle}</h1></div>
         </header>
 
+        {connectionLost || showUpdateHint ? (
+          <div className="alas-global-notices">
+            {connectionLost ? (
+              <Alert
+                className="alas-global-alert"
+                type="warning"
+                showIcon
+                message="与 ALAS 服务失去连接，正在重试"
+              />
+            ) : null}
+            {showUpdateHint ? (
+              <Alert
+                className="alas-global-alert"
+                type="success"
+                showIcon
+                message={translate(i18n, 'Gui.Update.HaveUpdate', '有新版本可用')}
+                action={(
+                  <Button
+                    size="small"
+                    type="primary"
+                    onClick={() => { window.location.hash = '#/update'; }}
+                  >
+                    {translate(i18n, 'Gui.Button.ClickToUpdate', '点击更新')}
+                  </Button>
+                )}
+              />
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="alas-contents">
           <nav className="alas-aside" aria-label="Primary">
             <button
@@ -233,7 +281,9 @@ export default function BasicLayout() {
                     maskImage: `url(${runIcon})`,
                   }}
                 />
-                {instance.name}
+                <span className="aside-button-label">
+                  <span className="aside-button-name">{instance.name}</span>
+                </span>
               </button>
             ))}
 

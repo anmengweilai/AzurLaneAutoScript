@@ -4,6 +4,7 @@ import threading
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from module.config.deep import deep_get, deep_iter, deep_set
+from module.config.env import IS_ON_PHONE_CLOUD
 from module.config.utils import filepath_args, filepath_config, filepath_i18n, read_file
 from module.logger import logger
 from module.submodule.utils import get_config_mod
@@ -267,7 +268,9 @@ class ConfigControl:
             config_name, mod_name = parts[0], parts[1]
         else:
             raise InvalidArgument("Filename must be <name>.json or <name>.<mod>.json")
-        self._validate_new_name(config_name)
+        if IS_ON_PHONE_CLOUD:
+            config_name = mod_name = "alas"
+        self._validate_import_name(config_name)
         State.config_updater.write_file(config_name, data, mod_name)
         return {"name": config_name, "mod": mod_name}
 
@@ -279,13 +282,23 @@ class ConfigControl:
         self.assert_exists(name)
         return filepath_config(name, get_config_mod(name))
 
+    def export(self, name: str) -> Dict[str, Any]:
+        self.assert_exists(name)
+        return {
+            "filename": self.export_filename(name),
+            "content": json_safe(self.read(name)),
+        }
+
     def _validate_new_name(self, name: str) -> None:
         from module.config.utils import alas_instance
 
-        if not name or len(name) > 64:
-            raise InvalidArgument("Name must contain 1-64 characters")
+        self._validate_import_name(name)
         if name in alas_instance():
             raise Conflict("Config name already exists", code="CONFIG_NAME_EXISTS")
+
+    def _validate_import_name(self, name: str) -> None:
+        if not name or len(name) > 64:
+            raise InvalidArgument("Name must contain 1-64 characters")
         if set(name) & set(".\\/:*?\"'<>|"):
             raise InvalidArgument("Name contains invalid characters")
         if name.lower().startswith("template"):

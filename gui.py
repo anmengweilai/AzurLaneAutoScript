@@ -60,6 +60,8 @@ def func(ev: threading.Event):
     ssl_cert = args.ssl_cert or State.deploy_config.WebuiSSLCert
     ssl = ssl_key is not None and ssl_cert is not None
     State.electron = args.electron
+    if args.key is not None:
+        State.deploy_config.Password = args.key
 
     logger.hr("Launcher config")
     logger.attr("Host", host)
