@@ -257,3 +257,19 @@ console.bat
 
 # Pylance configuration file
 pyrightconfig.json
+
+# Generated local knowledge graph
+graphify-out/
+
+# Control API local signing key
+config/.control_api_secret
+
+# macOS and local IDE metadata
+.DS_Store
+.openidea/
+
+# Frontend build dependencies and output
+frontend/node_modules/
+frontend/dist/
+/frontend/src/.umi-production/
+/frontend/src/.umi/

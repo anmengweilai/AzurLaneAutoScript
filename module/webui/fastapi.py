@@ -3,6 +3,7 @@ Copy from pywebio.platform.fastapi
 """
 import asyncio
 import os
+import traceback
 
 import uvicorn
 from pywebio.platform.fastapi import (STATIC_PATH, Session, cdn_validation,
@@ -15,6 +16,13 @@ from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.routing import Mount
 from starlette.staticfiles import StaticFiles
+from starlette.responses import JSONResponse
+
+from module.logger import logger
+from module.webui.control.routes import ControlApi
+from module.webui.control.errors import ControlApiError
+from module.webui.control.routes import error_response
+from module.webui.error_rendering import render_exception_html
 
 
 class HeaderMiddleware(BaseHTTPMiddleware):
@@ -37,6 +45,40 @@ def asgi_app(
     cdn = cdn_validation(cdn, "warn")
     if cdn is False:
         cdn = "pywebio_static"
+    control_api = ControlApi()
+    settings = dict(starlette_settings)
+    startup = list(settings.pop("on_startup", []))
+    shutdown = list(settings.pop("on_shutdown", []))
+    startup.append(control_api.startup)
+    shutdown.insert(0, control_api.shutdown)
+    exception_handlers = dict(settings.pop("exception_handlers", {}))
+    exception_handlers[ControlApiError] = error_response
+
+    async def internal_error_response(request, exc: Exception):
+        logger.exception(exc)
+        traceback_html = render_exception_html(exc)
+        event = control_api.internal_errors.record(
+            str(exc) or "An internal error occurred in the application",
+            source="api",
+            traceback_text=traceback.format_exc(),
+            html=traceback_html,
+        )
+        return JSONResponse(
+            {
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": str(exc) or "An internal error occurred in the application",
+                    "details": {
+                        "seq": event["seq"],
+                        "timestamp": event["timestamp"],
+                        "tracebackHtml": traceback_html,
+                    },
+                }
+            },
+            status_code=500,
+        )
+
+    exception_handlers[Exception] = internal_error_response
     routes = webio_routes(
         applications,
         cdn=cdn,
@@ -56,7 +98,13 @@ def asgi_app(
     )
     middleware = [Middleware(HeaderMiddleware)]
     return Starlette(
-        routes=routes, middleware=middleware, debug=debug, **starlette_settings
+        routes=control_api.routes + routes,
+        middleware=middleware,
+        debug=debug,
+        on_startup=startup,
+        on_shutdown=shutdown,
+        exception_handlers=exception_handlers,
+        **settings,
     )
 
 
