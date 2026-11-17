@@ -273,3 +273,9 @@ frontend/node_modules/
 frontend/dist/
 /frontend/src/.umi-production/
 /frontend/src/.umi/
+
+# MCP server dependencies
+integrations/alas-mcp/node_modules/
+
+# Wiki mirror data (regenerate with: python3 integrations/alas-wiki/wiki.py fetch catalog && fetch ships/equipment)
+integrations/alas-wiki/data/
