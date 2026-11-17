@@ -161,7 +161,7 @@ export default function Manage() {
           >
             <Button icon={<ImportOutlined />}>{tr('Gui.AppManage.Import', '导入')}</Button>
           </Upload>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => history.push('/instances')}>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => history.push('/home')}>
             {tr('Gui.AppManage.Back', '返回')}
           </Button>
         </Space>

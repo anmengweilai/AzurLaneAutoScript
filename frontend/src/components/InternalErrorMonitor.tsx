@@ -1,6 +1,6 @@
 import { Button, Modal, Result } from 'antd';
 import { Component, type ReactNode } from 'react';
-import { ApiError } from '@/services/api';
+import { ApiError, isConnectionFailureError, isNetworkFetchError, reportConnectionStatus } from '@/services/api';
 import { INTERNAL_ERROR_EVENT, makeInternalErrorKey, reportInternalError, type InternalErrorDetail } from '@/services/internalError';
 
 type InternalError = {
@@ -76,6 +76,14 @@ export default class InternalErrorMonitor extends Component<Props, State> {
 
   onUnhandledRejection = (event: PromiseRejectionEvent) => {
     if (event.reason instanceof ApiError && event.reason.status === 401) return;
+    if (isConnectionFailureError(event.reason)) {
+      event.preventDefault();
+      reportConnectionStatus(
+        false,
+        event.reason instanceof Error ? event.reason.message : String(event.reason),
+      );
+      return;
+    }
     event.preventDefault();
     const dedupeKey = event.reason instanceof ApiError && event.reason.details?.seq && event.reason.details?.timestamp
       ? makeInternalErrorKey(event.reason.details.seq, event.reason.details.timestamp)

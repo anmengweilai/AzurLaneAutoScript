@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Row, Segmented, Typography } from 'antd';
 import { api } from '@/services/api';
+import InstanceList from '@/components/InstanceList';
 import type { Bootstrap } from '@/types';
 
 const REPOSITORY_URL = 'https://github.com/LmeSzinc/AzurLaneAutoScript';
@@ -49,6 +50,9 @@ export default function Home() {
         }
       />
       <Row gutter={[16, 16]}>
+        <Col span={24}>
+          <InstanceList title="实例 / Instances" />
+        </Col>
         <Col xs={24} md={12}>
           <Card title="语言 / Language">
             {bootstrap ? (

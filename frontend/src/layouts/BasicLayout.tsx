@@ -10,7 +10,7 @@ import developIcon from '@/assets/gui/icon/develop.svg';
 import runIcon from '@/assets/gui/icon/run.svg';
 import settingIcon from '@/assets/gui/icon/setting.svg';
 import InternalErrorMonitor from '@/components/InternalErrorMonitor';
-import { api } from '@/services/api';
+import { api, CONNECTION_STATUS_EVENT, type ConnectionStatusDetail } from '@/services/api';
 import { useGlobalAlasStatus } from '@/hooks/useGlobalAlasStatus';
 import { translate, type TranslationMap } from '@/i18n';
 import type { Bootstrap, Instance } from '@/types';
@@ -118,9 +118,25 @@ export default function BasicLayout() {
 
   useEffect(() => {
     if (bootstrap?.authenticated && path === '/login') {
-      window.location.hash = '#/instances';
+      window.location.hash = '#/home';
     }
   }, [bootstrap?.authenticated, path]);
+
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const detail = (event as CustomEvent<ConnectionStatusDetail>).detail;
+      if (!detail) return;
+      if (!detail.connected) {
+        setConnectionLost(true);
+        return;
+      }
+      failureCount.current = 0;
+      setShellConnected(true);
+      setConnectionLost(false);
+    };
+    window.addEventListener(CONNECTION_STATUS_EVENT, listener);
+    return () => window.removeEventListener(CONNECTION_STATUS_EVENT, listener);
+  }, []);
 
   const { updateAvailable } = useGlobalAlasStatus({
     connected: shellConnected && !connectionLost,
@@ -166,7 +182,16 @@ export default function BasicLayout() {
     return (
       <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center' }}>
         <Spin size="large" />
-        {loadError ? <span style={{ marginLeft: 12 }}>{loadError}</span> : null}
+        {connectionLost ? (
+          <div className="alas-global-notices">
+            <Alert
+              className="alas-global-alert"
+              type="warning"
+              showIcon
+              message="与 ALAS 服务失去连接，正在重试"
+            />
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -176,7 +201,7 @@ export default function BasicLayout() {
     switch (selectedInstance?.state) {
       case 'running':
       case 'starting':
-        return { className: 'alas-status-border', key: 'Gui.Status.Running', fallback: 'Running' };
+        return { className: 'alas-status-border alas-status-border-success', key: 'Gui.Status.Running', fallback: 'Running' };
       case 'stopping':
       case 'stopped':
         return { className: 'alas-status-border alas-status-border-fill', key: 'Gui.Status.Inactive', fallback: 'Inactive' };

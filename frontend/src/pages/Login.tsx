@@ -13,7 +13,7 @@ export default function Login() {
     setError('');
     try {
       await api('/api/v1/auth/login', { method: 'POST', body: JSON.stringify(values) });
-      history.push('/instances');
+      history.push('/home');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     } finally {

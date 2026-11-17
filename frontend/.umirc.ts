@@ -24,9 +24,9 @@ export default defineConfig({
       path: '/',
       component: '@/layouts/BasicLayout',
       routes: [
-        { path: '/', redirect: '/instances' },
+        { path: '/', redirect: '/home' },
         { path: '/home', component: '@/pages/Home' },
-        { path: '/instances', component: '@/pages/Instances' },
+        { path: '/instances', redirect: '/home' },
         { path: '/instances/:name', component: '@/pages/InstanceDetail' },
         { path: '/manage', component: '@/pages/Manage' },
         { path: '/update', component: '@/pages/Update' },

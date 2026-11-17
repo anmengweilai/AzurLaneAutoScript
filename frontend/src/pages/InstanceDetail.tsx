@@ -204,7 +204,6 @@ export default function InstanceDetail(props?: { instanceName?: string }) {
       method: 'POST',
       body: JSON.stringify(task ? { task } : {}),
     });
-    message.success('操作已提交');
     loadInstance();
   };
 
