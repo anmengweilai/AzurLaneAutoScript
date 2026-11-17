@@ -57,7 +57,13 @@ def asgi_app(
     startup.append(control_api.startup)
     shutdown.insert(0, control_api.shutdown)
     exception_handlers = dict(settings.pop("exception_handlers", {}))
-    exception_handlers[ControlApiError] = error_response
+
+    def control_error_response(request, exc: ControlApiError):
+        # Starlette calls exception handlers with (request, exc); error_response
+        # only needs the error, so adapt the signature here.
+        return error_response(exc)
+
+    exception_handlers[ControlApiError] = control_error_response
 
     async def internal_error_response(request, exc: Exception):
         logger.exception(exc)
