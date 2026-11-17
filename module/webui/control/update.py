@@ -23,6 +23,9 @@ STATE_MAP = {
     "cancel": "canceling",
 }
 
+BUSY_STATES = ("checking", "start", "wait", "run update", "reload", "cancel")
+
+
 class UpdateControl:
     def __init__(self, internal_errors: InternalErrorBus) -> None:
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="control-update")
@@ -40,7 +43,32 @@ class UpdateControl:
         sha, author, time_text, message = value
         return {"sha": sha, "author": author, "date": time_text, "message": message}
 
+    def _head_sha(self, revision: str = "") -> Optional[str]:
+        try:
+            sha, _, _, _ = updater.get_commit(revision)
+        except Exception as error:
+            logger.warning(f"Cannot read commit of {revision or 'HEAD'}: {error}")
+            return None
+        return sha or None
+
+    def _reconcile(self) -> None:
+        """Drop a stale `update_available` state once the tree is really current.
+
+        `Updater.check_update()` only re-evaluates from 0/"failed"/"finish", so a
+        state of 1 never refreshes itself: an out-of-band update (git pull in a
+        terminal) would otherwise keep the "new version available" hint forever.
+        """
+        if updater.state != 1:
+            return
+        with self.lock:
+            local = self._head_sha()
+            upstream = self._head_sha(f"origin/{updater.Branch}")
+        if local and upstream and local == upstream:
+            logger.info(f"No update, local is already at origin/{updater.Branch}")
+            updater.state = 0
+
     def commits(self) -> Dict[str, Any]:
+        self._reconcile()
         with self.lock:
             local = self._commit(updater.get_commit(short_sha1=True))
             upstream = self._commit(updater.get_commit(f"origin/{updater.Branch}", short_sha1=True))
@@ -61,7 +89,10 @@ class UpdateControl:
         }
 
     def check(self) -> Dict[str, Any]:
-        if updater.state in ("checking", "start", "wait", "run update", "reload"):
+        if updater.state in BUSY_STATES:
+            return {"accepted": False, "state": self.state()}
+        self._reconcile()
+        if updater.state in BUSY_STATES:
             return {"accepted": False, "state": self.state()}
         self._safe_check()
         return {"accepted": True, "state": self.state()}
