@@ -226,6 +226,46 @@ def fetch_kind(kind: str, limit: int | None, force: bool, delay: float) -> None:
     print(f"完成：新增 {done}，跳过 {skipped}，失败 {len(failed)}", file=sys.stderr)
 
 
+def fetch_category(category: str, limit: int | None, force: bool, delay: float) -> None:
+    """抓某个分类下的全部页面，存到 data/<分类名>/ 。"""
+    slug = re.sub(r'[\\/:*?"<>|\s]', "_", category)
+    titles = category_members(category)
+    if limit:
+        titles = titles[:limit]
+
+    done = 0
+    skipped = 0
+    failed: list[str] = []
+    for index, title in enumerate(titles, 1):
+        md_path, _ = page_paths(slug, title)
+        if md_path.exists() and not force:
+            skipped += 1
+            continue
+        try:
+            text = page_wikitext(title)
+        except RuntimeError as error:
+            failed.append(f"{title}: {error}")
+            time.sleep(delay * 3)
+            continue
+        if text is None:
+            failed.append(f"{title}: page missing")
+            continue
+        write_page(slug, title, text)
+        done += 1
+        if index % 20 == 0 or index == len(titles):
+            print(f"[{category}] [{index}/{len(titles)}] {title} done={done} skip={skipped}", file=sys.stderr)
+        time.sleep(delay)
+
+    catalog = load_json(CATALOG, {})
+    catalog.setdefault("categories", {})[category] = titles
+    save_json(CATALOG, catalog)
+    meta = load_json(META, {})
+    meta[slug] = {"fetched_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                  "pages": {"total": len(titles), "written": done, "skipped": skipped, "failed": failed}}
+    save_json(META, meta)
+    print(f"[{category}] 完成：新增 {done}，跳过 {skipped}，失败 {len(failed)}", file=sys.stderr)
+
+
 def fetch_one(title: str, kind: str = "ships", delay: float = 2.0) -> None:
     text = page_wikitext(title)
     if text is None:
@@ -333,12 +373,17 @@ def stats() -> None:
     catalog = load_json(CATALOG, {})
     meta = load_json(META, {})
     print(f"清单抓取：{catalog.get('fetched_at', '—')}")
-    for kind in ("ships", "equipment"):
-        base = data_dir(kind)
-        count = len(list(base.glob("*.md"))) if base.exists() else 0
-        total = len(catalog.get(kind, []))
-        info = meta.get(kind, {}).get("pages", {})
-        print(f"{kind}: 本地 {count} / 清单 {total}，上次新增 {info.get('written', 0)}，失败 {len(info.get('failed', []))}")
+    total = 0
+    for base in sorted(p for p in DATA.iterdir() if p.is_dir() and p.name != "derived"):
+        count = len(list(base.glob("*.md")))
+        total += count
+        failed = len(meta.get(base.name, {}).get("pages", {}).get("failed", []))
+        print(f"  {base.name}: {count}" + (f"（失败 {failed}）" if failed else ""))
+    print(f"合计：{total} 页")
+    derived = DATA / "derived"
+    if derived.exists():
+        for file in sorted(derived.glob("*")):
+            print(f"  derived/{file.name}: {file.stat().st_size / 1024:.0f} KB")
     size = sum(f.stat().st_size for f in DATA.rglob("*") if f.is_file()) if DATA.exists() else 0
     print(f"数据目录：{DATA}（{size / 1024 / 1024:.1f} MB）")
     for kind, info in meta.items():
@@ -353,8 +398,9 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     fetch = sub.add_parser("fetch", help="抓取数据")
-    fetch.add_argument("target", choices=["catalog", "ships", "equipment", "page"])
+    fetch.add_argument("target", choices=["catalog", "ships", "equipment", "page", "category"])
     fetch.add_argument("title", nargs="?", help="fetch page 时给页面名")
+    fetch.add_argument("--category", help="fetch category 时的分类名，如 活动攻略")
     fetch.add_argument("--limit", type=int)
     fetch.add_argument("--force", action="store_true", help="已有文件也重抓")
     fetch.add_argument("--delay", type=float, default=1.6, help="请求间隔秒，默认 1.6")
@@ -388,6 +434,10 @@ def main() -> None:
             if not args.title:
                 parser.error("fetch page 需要一个页面名")
             fetch_one(args.title, delay=args.delay)
+        elif args.target == "category":
+            if not args.category:
+                parser.error("fetch category 需要 --category 分类名")
+            fetch_category(args.category, args.limit, args.force, args.delay)
         else:
             fetch_kind(args.target, args.limit, args.force, args.delay)
     elif args.command == "list":
