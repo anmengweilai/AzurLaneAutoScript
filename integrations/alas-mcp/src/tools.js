@@ -1,10 +1,10 @@
 /**
  * Model-facing tools for the Alas Control API.
  *
- * Four tools cover the whole surface: instance lifecycle, configuration,
- * log streaming, and service/system state. Each tool takes an `action`
- * instead of exposing ~25 near-identical endpoints, which keeps the tool
- * list small enough to stay in context.
+ * Five tools cover the whole surface: instance lifecycle, configuration, log
+ * streaming, emulator screen/input, and service/system state. Each tool takes an
+ * `action` instead of exposing ~30 near-identical endpoints, which keeps the
+ * tool list small enough to stay in context.
  */
 
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { AlasError } from './client.js';
 
 const INSTANCE_ACTIONS = ['list', 'get', 'start', 'stop', 'restart', 'overview', 'create', 'templates'];
 const CONFIG_ACTIONS = ['get', 'patch', 'validate', 'export', 'schema', 'menu', 'i18n'];
+const DEVICE_ACTIONS = ['screen', 'tap', 'swipe'];
 const SYSTEM_ACTIONS = [
   'health',
   'version',
@@ -225,6 +226,65 @@ export function registerAlasTools(server, client) {
     async ({ name, limit, cursor, wait_ms }) => {
       try {
         return text(await client.logs(name, { limit: limit ?? 80, cursor: cursor ?? null, waitMs: wait_ms ?? 2000 }));
+      } catch (error) {
+        return failure(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'alas_device',
+    {
+      title: 'Alas emulator',
+      description:
+        'See and touch the game screen over plain adb. `screen` returns the emulator screenshot as an image ' +
+        '(native resolution, so read coordinates straight off it); `tap` clicks one point; `swipe` drags from ' +
+        '(x1,y1) to (x2,y2) in `duration_ms` — short is a flick, long is a drag, same start and end >= 500 ms is a ' +
+        'long press. Coordinates are emulator pixels, not UI pixels. Stop the instance first: while it runs, ALAS ' +
+        'clicks on its own schedule and the two inputs fight over the screen. adb has one pointer, so no multi-touch.',
+      inputSchema: {
+        action: z.enum(DEVICE_ACTIONS).describe('What to do.'),
+        name: z.string().min(1).describe('Instance name.'),
+        x: z.number().int().min(0).optional().describe('With action=tap: absolute x in emulator pixels.'),
+        y: z.number().int().min(0).optional().describe('With action=tap: absolute y in emulator pixels.'),
+        x1: z.number().int().min(0).optional().describe('With action=swipe: start x.'),
+        y1: z.number().int().min(0).optional().describe('With action=swipe: start y.'),
+        x2: z.number().int().min(0).optional().describe('With action=swipe: end x.'),
+        y2: z.number().int().min(0).optional().describe('With action=swipe: end y.'),
+        duration_ms: z
+          .number()
+          .int()
+          .min(1)
+          .max(60000)
+          .optional()
+          .describe('With action=swipe: gesture length in ms, default 300.'),
+      },
+    },
+    async ({ action, name, x, y, x1, y1, x2, y2, duration_ms }) => {
+      try {
+        switch (action) {
+          case 'screen': {
+            const png = await client.screen(name);
+            return {
+              content: [
+                { type: 'image', data: png.toString('base64'), mimeType: 'image/png' },
+                { type: 'text', text: `Screenshot of ${name}: ${png.length} bytes, PNG` },
+              ],
+            };
+          }
+          case 'tap':
+            if (x === undefined || y === undefined) {
+              return failure(new Error('tap requires both x and y'));
+            }
+            return text(await client.tap(name, x, y));
+          case 'swipe':
+            if ([x1, y1, x2, y2].some((value) => value === undefined)) {
+              return failure(new Error('swipe requires x1, y1, x2, and y2'));
+            }
+            return text(await client.swipe(name, { x1, y1, x2, y2, durationMs: duration_ms }));
+          default:
+            return failure(new Error(`Unknown action: ${action}`));
+        }
       } catch (error) {
         return failure(error);
       }

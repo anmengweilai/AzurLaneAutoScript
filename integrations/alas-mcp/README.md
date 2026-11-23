@@ -1,7 +1,7 @@
 # Alas MCP server
 
 [Model Context Protocol](https://modelcontextprotocol.io) server for the Alas
-Control API (`/api/v1`). It exposes four tools, so any MCP client — DeepSeek
+Control API (`/api/v1`). It exposes five tools, so any MCP client — DeepSeek
 Harness, Claude Desktop, Cursor, Codex — can inspect and drive Alas without
 hand-writing HTTP calls.
 
@@ -16,10 +16,16 @@ otherwise loopback-only access).
 | `alas_instances` | list, get, start, stop, restart, overview, create, templates |
 | `alas_config` | get (optionally only selected paths), patch, validate, export, schema, menu, i18n |
 | `alas_logs` | recent in-memory log window for one instance, resumable by `cursor` |
+| `alas_device` | screenshot as an image block, tap, swipe/drag/long press (single pointer, over adb) |
 | `alas_system` | health, version, runtime, bootstrap, settings, update status/check/run/cancel, remote access |
 
-One tool per area rather than one per endpoint: ~25 individual tools would sit
-in every prompt, while the `action` enum keeps the same reach at four entries.
+One tool per area rather than one per endpoint: ~30 individual tools would sit
+in every prompt, while the `action` enum keeps the same reach at five entries.
+
+`alas_device` drives the emulator over plain adb, so it works while the instance
+is stopped. Coordinates are emulator pixels taken from the screenshot it returns;
+stop the instance before touching the screen, or ALAS will be clicking at the
+same time. adb has a single pointer, so multi-touch is not exposed.
 
 `alas_config` with `action: "patch"` validates and writes in one call. Add
 `dry_run: true` to check the values without saving. Saving while an instance is
@@ -79,8 +85,8 @@ connect, not reloaded.
 ## Test
 
 ```bash
-node --test test/         # read-only checks against a running panel
-ALAS_TEST_WRITE=1 node --test test/   # also exercises stop on a stopped instance
+node --test test/smoke.test.js          # read-only checks against a running panel
+ALAS_TEST_WRITE=1 node --test test/smoke.test.js   # also taps, swipes, and stops
 ```
 
 The suite expects Alas to be up on `ALAS_BASE_URL` with at least one instance.

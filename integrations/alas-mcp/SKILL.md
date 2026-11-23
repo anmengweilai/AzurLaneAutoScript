@@ -6,19 +6,20 @@ description: 操作碧蓝航线 Alas 面板（实例启停、读写配置、日�
 # alas-control：用 MCP 操作 Alas
 
 > 面板：`http://127.0.0.1:22267`，新界面在 `/app/`，旧 PyWebIO 界面在 `/`
-> 工具：`mcp__alas__alas_instances` / `alas_config` / `alas_logs` / `alas_system`
+> 工具：`mcp__alas__alas_instances` / `alas_config` / `alas_logs` / `alas_device` / `alas_system`
 > 服务端代码：`integrations/alas-mcp/`（本仓库），工具实现在 `src/tools.js`
 
 先确认工具在不在。调用列表里没有 `mcp__alas__*` 就说明 MCP 没挂上，别硬试别的路：
 去设置页看 MCP 那一行状态，或读 `~/.dsh/profiles/<profile>/cordis.patch.yml` 里 `mcp-alas` 条目。
 
-## 四个工具
+## 五个工具
 
 | 工具 | action | 对应网页 |
 |---|---|---|
 | `alas_instances` | `list` `get` `start` `stop` `restart` `overview` `create` `templates` | 「实例」页 + 实例详情的启停按钮 |
 | `alas_config` | `get` `patch` `validate` `export` `schema` `menu` `i18n` | 实例详情里的配置表单、批量动态页的「管理配置文件」 |
 | `alas_logs` | —（参数 `name` / `limit` / `cursor` / `wait_ms`） | 实例详情的 Log 面板 |
+| `alas_device` | `screen` `tap` `swipe`（参数 `name` / `x` `y` / `x1` `y1` `x2` `y2` `duration_ms`） | 没有对应网页：直接看模拟器画面、点、滑 |
 | `alas_system` | `health` `version` `runtime` `bootstrap` `settings` `update_settings` `update_status` `update_check` `update_run` `update_cancel` `remote_access` | 「主页」「更新器」「远程控制」「工具」页 |
 
 ## 状态模型
@@ -107,6 +108,9 @@ description: 操作碧蓝航线 Alas 面板（实例启停、读写配置、日�
 | 主页「强制重启」 | `alas_system` 里没有独立工具，用 `POST /api/v1/system/force-restart` |
 | 更新器页 | `alas_system` `update_*` |
 | 远程控制页 | `alas_system` `remote_access` |
+| 看游戏当前画面 | `alas_device` `screen`（返回 PNG 图片块，坐标就按这张图上的像素算） |
+| 点游戏里的按钮 | `alas_device` `tap`（`x` `y` 是模拟器原生像素） |
+| 滑动 / 拖动 / 长按 | `alas_device` `swipe`（短时长是滑，长时长是拖，起终点同一个点 + `duration_ms` ≥ 500 是长按） |
 
 工具没覆盖的两个动作（删除实例、force-restart）用 bash + curl 补，别自己造：
 ```bash
@@ -147,14 +151,22 @@ curl -s -X POST http://127.0.0.1:22267/api/v1/system/force-restart
 > MediaWiki 1.37，有 `api.php`，但没有 `extracts` 扩展，也没有 Cargo。
 > 作用：查舰船/装备/活动/大世界的**游戏知识**；alas 配置负责**执行**。两者配合才完整。
 >
-> **先查本地镜像**（`integrations/alas-wiki/`，舰船 697 / 装备 898 已落地）：
-> ```bash
-> cd integrations/alas-wiki
-> python3 wiki.py search 独角兽            # 全文搜
-> python3 wiki.py sections 企业            # 看章节
-> python3 wiki.py show 企业 --section 配装推荐
-> ```
-> 本地没命中、或要看渲染后的数值，再走下面的在线 API。
+> **先查本地镜像**（`integrations/alas-wiki/`）：舰船 697 + 装备 898 + 攻略类 1297 已落地。
+> 三层，从快到慢：
+> 1. **结构化表**（`data/derived/*.csv`，UTF-8 BOM，适合 grep / python）：
+>    - `ships.csv` — 编号, 名称, 类型, 阵营, 稀有度, 星级, 建造耗时, 英文名, 日文名, 型号
+>    - `equipment.csv` — 名称, 模板, 等级, 类型 + 各模板属性并集（147 列）
+>    - `guides.csv` — 分类, 标题, 日期, 关键词, 摘要（活动 / 关卡 / 打捞 / 原型舰 / 兵装 / 设备）
+>    ```bash
+>    cd integrations/alas-wiki
+>    grep 航母 data/derived/ships.csv | grep 超稀有          # 哪些超稀有航母
+>    grep 穿甲弹 data/derived/equipment.csv | cut -d, -f1     # 穿甲主炮清单
+>    grep 复刻 data/derived/guides.csv | cut -d, -f2,4        # 复刻活动的页面和信号
+>    ```
+> 2. **单页全文**：`python3 wiki.py search 独角兽` / `sections 企业` / `show 企业 --section 配装推荐`
+> 3. **在线 API**：本地没命中、或要看模板渲染后的数值时才用。
+>
+> 注意数据边界：舰船「初始星级」缺 27%（改造/方案船不填）；装备「类型」只覆盖 62.8%（防空炮、设备模板本身没这字段，分类在 `特性`/`属性` 里）；攻略「日期」覆盖率 21%（只有关卡模板带 `排序编号` 的才有）。
 
 ## 什么时候查 wiki
 

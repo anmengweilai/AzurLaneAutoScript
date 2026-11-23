@@ -20,6 +20,27 @@ export class AlasError extends Error {
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+const SCREENSHOT_TIMEOUT_MS = 30_000;
+
+/** Turn a non-2xx response into an AlasError using the Control API error body. */
+async function raiseForResponse(response, action) {
+  const text = await response.text();
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+  const error = data?.error ?? {};
+  throw new AlasError(
+    response.status,
+    error.code || 'REQUEST_FAILED',
+    error.message || (typeof data === 'string' && data ? data : `${action} failed: ${response.status}`),
+    error.details,
+  );
+}
 
 export class AlasClient {
   /**
@@ -208,6 +229,60 @@ export class AlasClient {
 
   i18n(locale = 'zh-CN') {
     return this.request(`/api/v1/i18n/${encodeURIComponent(locale)}`);
+  }
+
+  // --- device --------------------------------------------------------------
+
+  /**
+   * Fetch the emulator screenshot as a PNG buffer.
+   *
+   * The Control API answers with `image/png`, so this bypasses the JSON path;
+   * callers turn the buffer into a base64 image content block.
+   *
+   * @param {string} name instance name
+   */
+  async screen(name, { timeoutMs = SCREENSHOT_TIMEOUT_MS } = {}) {
+    const headers = this.headers({ Accept: 'image/png' });
+    let response;
+    try {
+      response = await fetch(`${this.baseUrl}/api/v1/instances/${encodeURIComponent(name)}/screen`, {
+        headers,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      if (error?.name === 'TimeoutError') {
+        throw new AlasError(0, 'TIMEOUT', `Alas did not return a screenshot within ${timeoutMs} ms`);
+      }
+      throw new AlasError(0, 'UNREACHABLE', `Cannot reach Alas at ${this.baseUrl}: ${error?.message ?? error}`);
+    }
+    if (!response.ok) {
+      await raiseForResponse(response, 'Screenshot');
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length === 0) {
+      throw new AlasError(0, 'SCREENSHOT_EMPTY', `Alas returned an empty screenshot for ${name}`);
+    }
+    return buffer;
+  }
+
+  /** Tap one absolute emulator pixel. */
+  tap(name, x, y) {
+    return this.request(`/api/v1/instances/${encodeURIComponent(name)}/tap`, {
+      method: 'POST',
+      body: { x, y },
+    });
+  }
+
+  /** Drag from (x1, y1) to (x2, y2); duration decides flick, drag, or long press. */
+  swipe(name, { x1, y1, x2, y2, durationMs }) {
+    const body = { x1, y1, x2, y2 };
+    if (durationMs !== undefined && durationMs !== null) {
+      body.duration_ms = durationMs;
+    }
+    return this.request(`/api/v1/instances/${encodeURIComponent(name)}/swipe`, {
+      method: 'POST',
+      body,
+    });
   }
 
   // --- logs ----------------------------------------------------------------

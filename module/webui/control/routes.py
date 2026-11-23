@@ -4,7 +4,7 @@ import subprocess
 import sys
 import time
 from urllib.parse import quote
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
@@ -18,6 +18,7 @@ from module.webui.control.events import EventHub, InternalErrorBus, ProcessLogCo
 from module.webui.control.instances import InstanceControl, validate_name
 from module.webui.control.security import ControlSecurity
 from module.webui.control.config import ConfigControl
+from module.webui.control.device import DeviceControl, coordinate, duration
 from module.webui.control.overview import overview
 from module.webui.control.system import remote_status, runtime
 from module.webui.control.update import UpdateControl
@@ -38,6 +39,22 @@ async def request_json(request: Request) -> Dict[str, Any]:
     if not isinstance(value, dict):
         raise InvalidArgument("Request body must be a JSON object")
     return value
+
+
+def tap_point(body: Dict[str, Any]) -> Tuple[int, int]:
+    """Read an absolute `x`/`y` tap point from a JSON body."""
+    return coordinate(body.get("x"), "x"), coordinate(body.get("y"), "y")
+
+
+def swipe_points(body: Dict[str, Any]) -> Tuple[int, int, int, int, int]:
+    """Read a `x1,y1 -> x2,y2` gesture plus its duration from a JSON body."""
+    return (
+        coordinate(body.get("x1"), "x1"),
+        coordinate(body.get("y1"), "y1"),
+        coordinate(body.get("x2"), "x2"),
+        coordinate(body.get("y2"), "y2"),
+        duration(body.get("duration_ms")),
+    )
 
 
 def error_response(error: ControlApiError) -> JSONResponse:
@@ -74,6 +91,7 @@ class ControlApi:
         self.internal_errors = InternalErrorBus()
         self.instances = InstanceControl(self.hub)
         self.config = ConfigControl()
+        self.devices = DeviceControl()
         self.updates = UpdateControl(self.internal_errors)
         self.collector = ProcessLogCollector(self.hub, ProcessManager._processes)
 
@@ -104,6 +122,9 @@ class ControlApi:
             Route("/api/v1/instances/{name}/start", self.start_instance, methods=["POST"]),
             Route("/api/v1/instances/{name}/stop", self.stop_instance, methods=["POST"]),
             Route("/api/v1/instances/{name}/restart", self.restart_instance, methods=["POST"]),
+            Route("/api/v1/instances/{name}/screen", self.instance_screen, methods=["GET"]),
+            Route("/api/v1/instances/{name}/tap", self.instance_tap, methods=["POST"]),
+            Route("/api/v1/instances/{name}/swipe", self.instance_swipe, methods=["POST"]),
             WebSocketRoute("/api/v1/instances/{name}/logs", self.instance_logs),
             WebSocketRoute("/api/v1/internal-errors/ws", self.internal_errors_stream),
             Route("/api/v1/update/status", self.update_status, methods=["GET"]),
@@ -313,6 +334,30 @@ class ControlApi:
         self.security.authenticate(request)
         name = request.path_params["name"]
         return JSONResponse(await run_in_threadpool(overview, name))
+
+    async def instance_screen(self, request: Request) -> Response:
+        self.security.authenticate(request)
+        name = request.path_params["name"]
+        data = await run_in_threadpool(self.devices.screenshot, name)
+        return Response(
+            content=data,
+            media_type="image/png",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    async def instance_tap(self, request: Request) -> JSONResponse:
+        self.security.authenticate(request)
+        name = request.path_params["name"]
+        x, y = tap_point(await request_json(request))
+        return JSONResponse(await run_in_threadpool(self.devices.tap, name, x, y))
+
+    async def instance_swipe(self, request: Request) -> JSONResponse:
+        self.security.authenticate(request)
+        name = request.path_params["name"]
+        x1, y1, x2, y2, duration_ms = swipe_points(await request_json(request))
+        return JSONResponse(
+            await run_in_threadpool(self.devices.swipe, name, x1, y1, x2, y2, duration_ms)
+        )
 
     async def update_status(self, request: Request) -> JSONResponse:
         self.security.authenticate(request)
